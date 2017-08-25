@@ -1,0 +1,418 @@
+// Sets custom properties for web analytics
+s.pageName = "MySAT:homepage";
+
+(function (window, document, $, NSAT) {
+	"use strict";
+
+	var afterModalFocusElem = null;
+
+	// focus the correct element after closing a modal (for hidden.bs.modal event)
+	function afterModalSetFocus(event) {
+		afterModalFocusElem.focus();
+	}
+
+	// set form values and submit form based on user action
+	function doProcess(options) {
+		var f = document.forms["viewMySatForm"];
+         
+		options = options || {};
+		options.regId = options.regId || "";
+		options.nextAction= options.nextAction|| "";
+		options.action = options.action || ""; // goes into dispatch
+		options.nextState = options.nextState || "";
+		options.updateSdqRequired = options.updateSdqRequired || "false";
+		options.viewScore = options.viewScore || "true";
+		options.scoreFulfillment = options.scoreFulfillment || "";
+        options.useBookmark = options.useBookmark || "";
+
+		if (NSAT.Util.isNonEmptyString(options.action)) {
+			switch(options.action)  {
+				case "completeReg":
+				case "completeEZReg":
+					if (f.updateSdqRequired.value === "true") {
+						if (confirm("It has been awhile since you updated your profile information.  Would you like to update your profile now?")) {
+							options.action = "updateMyProfile";
+						}
+					}
+					break;
+				case "deleteRegTest":
+					if(!confirm("Are you sure you want to delete this registration?")) {
+						return;
+					}
+					break;
+			}
+			f.regId.value = options.regId;
+			f.dispatch.value = options.action;
+			f.nextState.value = options.nextState;
+			f.nextAction.value = options.nextAction;
+			f.updateSdqRequired.value = options.updateSdqRequired;
+			f.viewScore.value = options.viewScore;
+			f.scoreFulfillment.value = options.scoreFulfillment;
+            f.useBookmark.value =  options.useBookmark;
+			f.submit();
+		}
+	}
+
+	function printTicket(regId, regNo) {
+		// TODO: should web analytic values be set here or by shouldprintPdfTicketAction page
+		if (typeof s !== "undefined" && s !== null) {
+			s.pageName = "satregistration:printadmissionticket";
+			s.events = "event75:" + regNo;
+			s.t();
+		}
+		NSAT.Browser.openWindow({
+			"url": "/satweb/registration/printPdfTicketAction.action?regId=" + regId,
+			"title": "Print SAT Admission Ticket",
+			"width": 960,
+			"height": 800
+		});
+	}
+
+	function setupEventHandlers() {
+		// NOTE: selectors are arranged alphabetically by ID name and then by class name
+
+		$(".nsat-actionHelp").on("click", function (event) {
+			event.preventDefault();
+			NSAT.Browser.openWindow({
+				"url": event.currentTarget.href,
+				"title": "My SAT Help",
+				"width": 960,
+				"height": 800
+			});
+		});
+		$("#actionReportingOptionsProceed").on("click", (function () {
+			var f = document.forms["paperScoreReportForm"]; // store the form reference
+
+			return function (event) {
+				if (f.paperScoreReportOptIn[0].checked || f.paperScoreReportOptIn[1].checked) {
+					f.submit();
+				}
+				else {
+					alert("You must select a score reporting option before updating.");
+				}
+			};
+		}()));
+		$("#actionSeeSentScores").on("click", function (event) {
+			event.preventDefault();
+			doProcess({
+				"action": "viewScoreSendHistory"
+			});
+		});
+		$("#actionSendScoresNowProceed").on("click", function (event) {
+			if (event.currentTarget.getAttribute("data-scoreExist") === "true") {
+				doProcess({
+					"action": "viewScoreHist"
+				});
+			}
+			else {
+				alert("You do not have any scores available to send to colleges or other institutions as this time.");
+			}
+		});
+		$("#actionUpdateProfile").on("click", function (event) {
+			event.preventDefault();
+			doProcess({
+				"action": "updateMyProfile"
+			});
+		});
+		$("#actionViewCareerMatch").on("click", function (event) {
+			event.preventDefault();
+			doProcess({
+				"action": "viewMajorCareer"
+			});
+		});
+		$("#actionViewCollegeMatch").on("click", function (event) {
+			event.preventDefault();
+			doProcess({
+				"action": "viewCollegeMatch"
+			});
+		});
+		$("#actionViewScholarship").on("click", function (event) {
+			event.preventDefault();
+			document.location.href = "/satweb/scorereport/exitScoreReportAction.do?nextState=http://www.collegeboard.org/student/pay/index.html";
+		});
+
+        $("#useBookmarkProceed").on("click", function (event) {
+            event.preventDefault();
+            doProcess({
+                "action": "displayGettingStarted",
+                "nextAction": "initRegistration",
+                "nextState": "termsAndConditions",
+                "useBookmark": true
+            });
+        });
+        $("#dontUseBookmark").on("click", function (event) {
+            event.preventDefault();
+            doProcess({
+                "action": "displayGettingStarted",
+                "nextAction": "initRegistration",
+                "nextState": "termsAndConditions",
+                "useBookmark": false
+            });
+        });
+
+		$(".nsat-actionRegisterNowCtl").on("click", function (event) {
+			event.preventDefault();
+            if ($(this).hasClass('showBookMarkMessage')){
+                var $bookmarkModal = $("#useBookmarkModal"); // store the modal reference
+                $bookmarkModal.modal("show");
+                afterModalFocusElem = this;
+            }else {
+                doProcess({
+                    "action": "displayGettingStarted",
+                    "nextAction": "initRegistration",
+                    "nextState": "termsAndConditions",
+                    "useBookmark": false
+                });
+            }
+		});
+		
+		$(".nsat-actionRegisterNowOverLimitCtl").on("click", function (event) {
+			event.preventDefault();
+			alert("You have too many open registrations and cannot register for the SAT online.  Please contact Customer Service at (866) 756 7346 to register for the SAT.")
+		});
+		
+		$(".nsat-home-deleteRegistrationCtl").on("click", function (event) {
+			event.preventDefault();
+			doProcess({
+				"action": "deleteRegTest",
+				"regId": event.currentTarget.getAttribute("data-reg")
+			});
+		});
+		$(".nsat-home-editScoreReportPref").on("click", (function () {
+			var $reportingOptionsModal = $("#reportingOptionsModal"); // store the modal reference
+
+			return function (event) {
+				event.preventDefault();
+				$("#paperScoreReportOptInRegId").val(event.currentTarget.getAttribute("data-reg"));
+				$reportingOptionsModal.modal("show");
+				afterModalFocusElem = this;
+			};
+		}()));
+		$(".nsat-home-finishRegisteringCtl").on("click", function (event) {
+			event.preventDefault();
+			doProcess({
+				"action": "displayGettingStarted",
+				"nextAction": "completeReg",
+				"regId": event.currentTarget.getAttribute("data-reg")
+			});
+		});
+		$(".nsat-home-finishRegistrationCtl").on("click", function (event) {
+			event.preventDefault();
+			doProcess({
+				"action": "displayGettingStarted",
+				"nextAction": "completeReg",
+				"regId": event.currentTarget.getAttribute("data-reg")
+			});
+		});
+		$(".nsat-home-orderScoreVerificationCtl").on("click", function (event) {
+			event.preventDefault();
+			doProcess({
+				"action": "orderScoreService",
+				"regId": event.currentTarget.getAttribute("data-reg")
+			});
+		});
+		$(".nsat-home-printTicketCtl").on("click", function (event) {
+			var reg = event.currentTarget.getAttribute("data-reg").split("|"); // regId|regNo
+			event.preventDefault();
+			printTicket(reg[0], reg[1]);
+		});
+		$(".nsat-home-scoreImproveCtl").on("click", function (event) {
+			event.preventDefault();
+			NSAT.Browser.openWindow({
+				"url": event.currentTarget.getAttribute("data-skillmap"),
+				"title": "ScoreSkillMap",
+				"width": 960,
+				"height": 800
+			});
+		});
+		$(".nsat-home-scoreIsUnavailableCtl").on("click", function (event) {
+			event.preventDefault();
+			NSAT.Browser.openWindow({
+				"url": "http://sat.collegeboard.org/scores/availability#whyScoresNotOnline",
+				"title": "ScoresNotAvailable",
+				"width": 960,
+				"height": 800
+			});
+		});
+		$(".nsat-home-scoreReleaseCtl").on("click", function (event) {
+			event.preventDefault();
+			alert("Please call customer service at (866) 756-7346 Domestic or (212) 713-7789 International to release scores on hold.");
+		});
+		$(".nsat-home-scoreUnderstandCtl").on("click", function (event) {
+			var reg = event.currentTarget.getAttribute("data-reg").split("|"); // regId|flag
+			event.preventDefault();
+			if (reg[1] === "true" ) {
+				doProcess({
+					"action": "viewScoreReport",
+					"regId": reg[0]
+				});
+			}
+			else {
+				if (reg[1] === "false") {
+					alert("This report is not available.");
+				}
+				else {
+					alert("This report will be available on " + reg[1] + ".");
+				}
+			}
+		});
+		$(".nsat-home-scoreUnderstandRSatCtl").on("click", function (event) {
+			var reg = event.currentTarget.getAttribute("data-reg").split("|"); // regId|flag
+			event.preventDefault();
+			if (reg[1] === "true" ) {
+				$(event.currentTarget).unbind('click');
+                event.currentTarget.click();
+			}
+			else {
+				if (reg[1] === "false") {
+					alert("This report is not available.");
+				}
+				else {
+					alert("This report will be available on " + reg[1] + ".");
+				}
+			}
+		});
+		$(".nsat-home-seeSentScoresCtl").on("click", function (event) {
+			var reg = event.currentTarget.getAttribute("data-reg").split("|"); // regId|flag
+			event.preventDefault();
+			if (reg[1] === "true" ) {
+				$(event.currentTarget).unbind('click');
+                event.currentTarget.click();
+			}
+			else {
+				if (reg[1] === "false") {
+					alert("This report is not available.");
+				}
+				else {
+					alert("This report will be available on " + reg[1] + ".");
+				}
+			}
+		});
+		$(".nsat-home-sendAvailableScoresNow").on("click", (function () {
+			var $sendScoresNowModal = $("#sendScoresNowModal"); // store the modal reference
+
+			return function (event) {
+				event.preventDefault();
+				$sendScoresNowModal.modal("show");
+				afterModalFocusElem = this;
+			};
+		}()));
+		
+		$('#showeligibilityPdfLink').click(function(e){
+		    e.preventDefault();
+		    var $cafwPrintModal = $("#cafwPrintModal"); // store the modal reference
+			$cafwPrintModal.modal("show");
+			
+			if (typeof s !== "undefined" && s !== null) {
+				s.pageName = "collegeappfeewaivers:modal-sat";
+				s.t();
+			}
+			afterModalFocusElem = this;
+		});
+			
+		
+		$("#modal1OKBtn").click(function (event) {
+			event.preventDefault();
+			var webanalyticsId = event.currentTarget.getAttribute("data-webanalyticsId");
+			
+			if (typeof s !== "undefined" && s !== null) {
+				s.pageName = "collegeappfeewaivers:printfeewaivers-sat";
+				s.events = "event82:" + webanalyticsId;
+				s.t();
+			}
+			
+			if(typeof(s)!='undefined')
+			{
+				//s.trackIntCampaign('cafwmodal:mysatbottom');
+				s.t();
+			}
+			
+			NSAT.Browser.openWindow({
+				"url": "mycollegeappfw.cafw",
+				"title": "My College Application Fee Waivers",
+				"width": 960,
+				"height": 800
+			});
+			
+			$("#cafwPrintModal").modal('hide');
+			afterModalFocusElem = this;
+	
+		});
+		
+		$(".nsat-home-collegefeewaiver").on("click", function (event) {
+			event.preventDefault();
+			var pageName = event.currentTarget.getAttribute("data-pageName");
+						
+			if(typeof(s)!='undefined')
+			{
+				//s.trackIntCampaign(pageName);
+				s.t();
+			}
+			NSAT.Browser.openWindow({
+				"url": "https://bigfuture.collegeboard.org/get-in/applying-101/college-application-fee-waivers/participating-colleges",
+				"title": "College Application Fee Waivers",
+				"width": 960,
+				"height": 800
+			});
+		});
+		
+		$(".nsat-home-browse-faq").on("click", function (event) {
+			event.preventDefault();
+			NSAT.Browser.openWindow({
+				"url": " https://bigfuture.collegeboard.org/get-in/applying-101/college-application-fee-waivers",
+				"title": "College Application Fee Waivers",
+				"width": 960,
+				"height": 800
+			});
+		});
+		
+		$(".nsat-home-sendScoresWhen").on("click", (function () {
+			var $sendScoresWhenModal = $("#sendScoresWhenModal"), // store the modal reference
+				$actionSendScoresWhenProceed = $("#actionSendScoresWhenProceed"), // store the button reference
+				$regDateLongId = $("#reportingRegDateLongId"), // store the two element references
+				$regDateShortId = $("#reportingRegDateShortId");
+
+			return function (event) {
+				var reg = event.currentTarget.getAttribute("data-reg").split("|"); // action|regId|long date|short date
+				event.preventDefault();
+				$regDateLongId.html(reg[2]);
+				$regDateShortId.html(reg[3]);
+				$actionSendScoresWhenProceed
+					.off("click")
+					.on("click", function (event2) {
+						event2.preventDefault();
+						doProcess({
+							"action": reg[0],
+							"regId": reg[1]
+						});
+					});
+				$sendScoresWhenModal.modal("show");
+				afterModalFocusElem = this;
+			};
+		}()));
+
+	}
+
+
+	// on document ready
+	$(function () {
+		
+	
+		
+		// display any alert messages
+		// TODO: better way to get values from ftl?
+		$.each($(document.forms["alertMessages"]).find("input"), function (index, item) {
+			alert(item.value);
+		});
+
+		// setup click handlers
+		setupEventHandlers();
+
+		// force focus to return to the correct element once a modal closes
+		$(".modal").on("hidden.bs.modal", afterModalSetFocus);
+	    
+		//window.location="/satweb/scorereport/detailScoreReportAction.do?regId=E48DEF530862AE0402C0A19442A74";
+
+	}); // on document ready
+
+}(window, document, window.jQuery, NSAT));
